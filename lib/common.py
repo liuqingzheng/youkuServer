@@ -1,6 +1,22 @@
 import hashlib
-import time
 import os
+import time
+import json
+import struct
+
+def login_auth(func):
+    def wrapper(*args, **kwargs):
+        from server import use_data as mu
+        for value in mu.alive_user.values():
+            if value[0] == args[0]['session']:
+                args[0]['user_id'] = value[1]
+                break
+        if not args[0].get('user_id', None):
+            send_back({'flag': False, 'msg': '您没有登录'}, args[1])
+        else:
+            return func(*args, **kwargs)
+
+    return wrapper
 
 
 def get_uuid(name):
@@ -29,3 +45,10 @@ def get_bigfile_md5(file_path):
                 f.seek(line)
                 md.update(f.read(10))
         return md.hexdigest()
+
+
+def send_back(back_dic, conn):
+
+    head_json_bytes = json.dumps(back_dic).encode('utf-8')
+    conn.send(struct.pack('i', len(head_json_bytes)))  # 先发报头的长度
+    conn.send(head_json_bytes)

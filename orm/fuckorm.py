@@ -10,8 +10,8 @@ class Field(object):
 
 
 class StringField(Field):
-    def __init__(self, name=None, ddl='varchar(100)', primary_key=False, default=None):
-        super().__init__(name, ddl, primary_key, default)
+    def __init__(self, name=None, column_type='varchar(100)', primary_key=False, default=None):
+        super().__init__(name, column_type, primary_key, default)
 
 
 class IntegerField(Field):

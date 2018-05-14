@@ -8,17 +8,33 @@
 # 查看公告（包括历史公告）
 from db import models
 import os
+from lib import common
 
 
-def buy_member(user_dic):
+@common.login_auth
+def buy_member(user_dic, conn):
+    '''
+    购买会员功能，直接将is_vip字段设为1
+    :param user_dic:
+    :param conn:
+    :return:
+    '''
     user = models.User.select_one(id=user_dic['user_id'])
     user.is_vip = 1
     user.update()
     back_dic = {'flag': True, 'msg': 'buy success'}
-    return back_dic
+    common.send_back(back_dic, conn)
 
 
-def get_movie_list(user_dic):
+@common.login_auth
+def get_movie_list(user_dic, conn):
+    '''
+    获取视频列表：取出全部视频，过滤掉删除的视频，根据前台传来的查询条件，把电影放到列表里
+    :param user_dic:
+    :param conn:
+    :return:
+    '''
+    back_dic = {}
     movie_list = models.Movie.select_all()
     back_movie_list = []
     if movie_list:  # 不为空，继续查询，为空直接返回false
@@ -38,18 +54,21 @@ def get_movie_list(user_dic):
                         back_movie_list.append([movie.name, '收费', movie.id])
 
         if back_movie_list:
-            return {'flag': True, 'movie_list': back_movie_list}
+            back_dic = {'flag': True, 'movie_list': back_movie_list}
         else:
-            return {'flag': False, 'msg': '暂无可查看影片'}
+            back_dic = {'flag': False, 'msg': '暂无可查看影片'}
     else:
-        return {'flag': False, 'msg': '暂无影片'}
+        back_dic = {'flag': False, 'msg': '暂无影片'}
+    common.send_back(back_dic, conn)
 
 
-def download_movie(user_dic):
+@common.login_auth
+def download_movie(user_dic, conn):
     movie = models.Movie.select_one(id=user_dic['movie_id'])
     if not movie:  # 电影不存在，返回false
         back_dic = {'flag': False, 'msg': '该电影不存在'}
-        return back_dic
+        common.send_back(back_dic, conn)
+        return
     user = models.User.select_one(id=user_dic['user_id'])
     send_back_dic = {'flag': True}
     if user_dic['movie_type'] == 'free':  # 下载免费电影，非会员需要等待；下载收费电影，不需要等待了直接下
@@ -60,20 +79,40 @@ def download_movie(user_dic):
 
     send_back_dic['filename'] = movie.name
     send_back_dic['filesize'] = os.path.getsize(movie.path)
-    send_back_dic['path'] = movie.path
     # 把下载记录保存到记录表中
     down_record = models.DownloadRecord(user_id=user_dic['user_id'], movie_id=movie.id)
     down_record.save()
-    return send_back_dic
+    common.send_back(send_back_dic, conn)
+    with open(movie.path, 'rb')as f:
+        for line in f:
+            conn.send(line)
 
 
-def check_notice(user_dic):
+@common.login_auth
+def check_notice(user_dic, conn):
+    '''
+    查看公告功能
+    :param user_dic:
+    :param conn:
+    :return:
+    '''
     # 直接调用通过条数查询的接口，传入None表示全查
-    return check_notice_by_count(count=None)
+    notice_list = check_notice_by_count(count=None)
+    if notice_list:
+        back_dic={'flag': True, 'notice_list': notice_list}
+    else:
+        back_dic={'flag': False, 'msg': '暂无公告'}
+
+    common.send_back(back_dic, conn)
 
 
 def check_notice_by_count(count=None):
-    # count 为None，查全部，为1 查一条
+    '''
+    查看功能的方法，供内部调用
+    count 为None，查全部，为1 查一条
+    :param count:
+    :return:
+    '''
     notice_list = models.Notice.select_all()
     back_notice_list = []
     if notice_list:  # 不为空，继续查询，为空直接返回false
@@ -81,13 +120,15 @@ def check_notice_by_count(count=None):
             for notice in notice_list:
                 back_notice_list.append({notice.name: notice.content})
         else:  # 查一条
-            back_notice_list.append({notice_list[0].name: notice_list[0].content})
-        return {'flag': True, 'notice_list': back_notice_list}
+            last_row=len(notice_list)-1
+            back_notice_list.append({notice_list[last_row].name: notice_list[last_row].content})
+        return back_notice_list
     else:
-        return {'flag': False, 'msg': '暂无公告'}
+        return False
 
 
-def check_download_record(user_dic):
+@common.login_auth
+def check_download_record(user_dic, conn):
     '''
     查看下载记录：
     先通过user_id到DownloadRecord表中查到下载的每一条记录，
@@ -98,11 +139,11 @@ def check_download_record(user_dic):
     download_record = models.DownloadRecord.select_all(user_id=user_dic['user_id'])
     if not download_record:
         back_dic = {'flag': False, 'msg': '暂无观影记录'}
-        return back_dic
+        common.send_back(back_dic, conn)
     else:
         download_list = []
         for record in download_record:
             movie = models.Movie.select_one(id=record.movie_id)
             download_list.append(movie.name)
         back_dic = {'flag': True, 'msg': 'buy success', 'download_list': download_list}
-        return back_dic
+        common.send_back(back_dic, conn)

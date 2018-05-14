@@ -6,7 +6,7 @@ from threading import current_thread
 class MysqlPool:
     def __init__(self):
         self.conn = db_pool.POOL.connection()
-        print(db_pool.POOL)
+        # print(db_pool.POOL)
         # print(current_thread().getName(), '拿到连接', self.conn)
         # print(current_thread().getName(), '池子里目前有', db_pool.POOL._idle_cache, '\r\n')
         self.cursor = self.conn.cursor(cursor=pymysql.cursors.DictCursor)
